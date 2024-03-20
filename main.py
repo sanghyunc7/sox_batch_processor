@@ -29,14 +29,23 @@ def get_all_files(parent_dir):
     return all_files, all_dir
 
 
-def convert_to_output_path(path):
+def digest_input(path):
     '''
-    changes output path.
-    does not change file extension.
+    takes in an input file, and returns useful information.
+    Returns
+    transplanted_input: the input file's path if it were copied over to OUT_DIR. Essentially readlink -f $OUT_DIR/input_file
+    input_extension: get the file extension of the input file
+    output_flac: Essentially readlink -f $OUT_DIR/output_file
+    
+    Note: It can also be used for finding output_dir.
     '''
     relative_path = path[len(IN_DIR):]
-    absolute_out = os.path.join(OUT_DIR, relative_path)
-    return absolute_out
+    transplanted_input = os.path.join(OUT_DIR, relative_path)
+    file_parts = transplanted_input.split(".")
+    input_extension = file_parts[-1]
+    file_parts[-1] = "flac"
+    output_flac = ".".join(file_parts)
+    return transplanted_input, input_extension, output_flac
 
 
 def create_directories(all_dir):
@@ -46,7 +55,7 @@ def create_directories(all_dir):
     can run into concurrency issues when they're both creating new_dir
     '''
     for d in all_dir:
-        output_dir = convert_to_output_path(d)
+        output_dir, garbage1, garbage2 = digest_input(d)
         # does mkdir -p
         os.makedirs(output_dir, exist_ok=True)
 
@@ -61,41 +70,35 @@ def find_sample_rate(file):
     res = [item.decode("utf-8") for item in result.stdout.split()]
     sample_rate = res[res.index("Rate") + 2] # "Rate", ":", "44100"
     return sample_rate
-
-
-def upsample_sinc(file):
-    out_file = convert_to_output_path(file)
-    file_parts = out_file.split('.')
     
+
+def upsample_sinc(input):
+    transplanted_input, input_extension, output_flac  = digest_input(input)
     # do not perform upsampling
-    if file_parts[-1] not in INPUT_FORMATS:
-        if os.path.exists(out_file):
-            print(out_file, "already exists")
+    if input_extension not in INPUT_FORMATS:
+        if os.path.exists(transplanted_input):
+            print(transplanted_input, "already exists")
             return
         cmd = f"cp input output".split()
-        cmd[cmd.index("input")] = file
-        cmd[cmd.index("output")] = out_file
-
-        subprocess.run(cmd, capture_output=True)
-        print(result.stdout.decode())
+        cmd[cmd.index("input")] = input
+        cmd[cmd.index("output")] = transplanted_input
+        result = subprocess.run(cmd, capture_output=True)
+        print(result.stderr.decode())
         return
     
-    sample_rate = find_sample_rate(file)
+    if os.path.exists(output_flac):
+        print(output_flac, "already exists")
+        return
+    
+    sample_rate = find_sample_rate(input)
     sample_target = 192000
     if sample_rate % 44100 == 0:
         sample_target = 176400
 
 
-    file_parts[-1] = 'flac'
-    out_file_flac = ".".join(file_parts)
-    if os.path.exists(out_file_flac):
-        print(out_file_flac, "already exists")
-        return
-    
-
     cmd = "./sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
-    cmd[cmd.index("input")] = file
-    cmd[cmd.index("output")] = out_file_flac
+    cmd[cmd.index("input")] = input
+    cmd[cmd.index("output")] = output_flac
     cmd[cmd.index("sample_target")] = sample_target
     result = subprocess.run(cmd, capture_output=True)
     print(result.stdout.decode())
