@@ -30,22 +30,40 @@ def get_all_files(parent_dir):
 
 
 def convert_to_output_path(path):
+    '''
+    changes output path.
+    does not change file extension.
+    '''
     relative_path = path[len(IN_DIR):]
     absolute_out = os.path.join(OUT_DIR, relative_path)
     return absolute_out
 
 
-# let a single thread create the directories first
-# otherwise, two processes doing new_dir/file1 and new_dir/file2 respectively
-# can run into concurrency issues when they're both creating new_dir
 def create_directories(all_dir):
+    '''
+    let a single thread create the directories first
+    otherwise, two processes doing new_dir/file1 and new_dir/file2 respectively
+    can run into concurrency issues when they're both creating new_dir
+    '''
     for d in all_dir:
         output_dir = convert_to_output_path(d)
         # does mkdir -p
         os.makedirs(output_dir, exist_ok=True)
 
 
-def upsample(file):
+
+def find_sample_rate(file):
+    cmd = f"sox --info input \n".split()
+    # do this instead of f-strings because we don't want to split the "file" with spaces
+    cmd[cmd.index("input")] = file 
+
+    result = subprocess.run(cmd, capture_output=True)
+    res = [item.decode("utf-8") for item in result.stdout.split()]
+    sample_rate = res[res.index("Rate") + 2] # "Rate", ":", "44100"
+    return sample_rate
+
+
+def upsample_sinc(file):
     out_file = convert_to_output_path(file)
     file_parts = out_file.split('.')
     
@@ -54,24 +72,31 @@ def upsample(file):
         if os.path.exists(out_file):
             print(out_file, "already exists")
             return
-        cmd = f"cp {file} {out_file}".split()
+        cmd = f"cp input output".split()
+        cmd[cmd.index("input")] = file
+        cmd[cmd.index("output")] = out_file
+
         subprocess.run(cmd, capture_output=True)
         print(result.stdout.decode())
         return
     
-    # sample_rate = 
-    
-    
+    sample_rate = find_sample_rate(file)
+    sample_target = 192000
+    if sample_rate % 44100 == 0:
+        sample_target = 176400
+
+
     file_parts[-1] = 'flac'
-    out_file = ".".join(file_parts)
-    if os.path.exists(out_file):
-        print(out_file, "already exists")
+    out_file_flac = ".".join(file_parts)
+    if os.path.exists(out_file_flac):
+        print(out_file_flac, "already exists")
         return
     
 
-    cmd = "./sox -S -V6 placeholder1 -b 24 -r 176400 placeholder2 upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
-    cmd[cmd.index("placeholder1")] = file # do this instead of f-strings because we don't want to split the file with spaces
-    cmd[cmd.index("placeholder2")] = out_file
+    cmd = "./sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
+    cmd[cmd.index("input")] = file
+    cmd[cmd.index("output")] = out_file_flac
+    cmd[cmd.index("sample_target")] = sample_target
     result = subprocess.run(cmd, capture_output=True)
     print(result.stdout.decode())
 
