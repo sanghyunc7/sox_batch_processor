@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import multiprocessing
 
 
 # root directory for music
@@ -8,6 +9,9 @@ IN_DIR = sys.argv[1]
 OUT_DIR = "/mnt/f/HiRes"
 EXCLUDE_DIRS = ["__MACOSX"]
 INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu dat dvms f32 f4 f64 f8 flac fssd gsrt hcom htk ima ircam la lpc lpc10 lu maud mp2 mp3 nist prc raw s1 s16 s2 s24 s3 s32 s4 s8 sb sf sl sln smp snd sndr sndt sou sox sph sw txw u1 u16 u2 u24 u3 u32 u4 u8 ub ul uw vms voc vox wav wavpcm wve xa".split()
+
+
+file_lock = multiprocessing.Lock()
 
 if not IN_DIR.startswith("/"):
     print("Use absolute path for argument.")
@@ -69,7 +73,7 @@ def find_sample_rate(file):
     result = subprocess.run(cmd, capture_output=True)
     res = [item.decode("utf-8") for item in result.stdout.split()]
     sample_rate = res[res.index("Rate") + 2] # "Rate", ":", "44100"
-    return sample_rate
+    return int(sample_rate)
     
 
 def upsample_sinc(input):
@@ -96,10 +100,11 @@ def upsample_sinc(input):
         sample_target = 176400
 
 
-    cmd = "./sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
+    cmd = "sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
     cmd[cmd.index("input")] = input
     cmd[cmd.index("output")] = output_flac
-    cmd[cmd.index("sample_target")] = sample_target
+    cmd[cmd.index("sample_target")] = str(sample_target)
+    print("Making...", output_flac)
     result = subprocess.run(cmd, capture_output=True)
     print(result.stdout.decode())
 
@@ -108,7 +113,7 @@ all_files, all_dir = get_all_files(IN_DIR)
 create_directories(all_dir)
 
 for f in all_files:
-    upsample(f)
+    upsample_sinc(f)
 
 
 
