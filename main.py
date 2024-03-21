@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import multiprocessing
+import logging
 from collections import Counter
 
 
@@ -15,6 +16,10 @@ INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu da
 history_file_lock = multiprocessing.Lock()
 history_file = os.path.join(OUT_DIR, "history.txt")
 history_readonly = set() # should be used as read-only unless during init
+
+info_log = open("info.log", 'a')
+error_log = open("error.log", 'a')
+
 
 if not IN_DIR.startswith("/"):
     print("Use absolute path for argument.")
