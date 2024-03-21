@@ -5,25 +5,23 @@ import subprocess
 
 
 sample_rates = []
-for r, dirs, files in os.walk("/home/dan/Music/classic/john/Tchaikovsky"):
-    print(r)
-    
-    dirs[:] = [d for d in dirs if d not in "__MACOSX"]
 
-    for f in files:
-        if not (f.endswith(".mp3") or f.endswith(".flac")):
-            continue
-        # f = "Pablo Casals-06-Bach _ Partita No.1 In B Flat Major BWV.825 - IV. Sarabande.mp3"
-        file = os.path.join(r, f)
-        print(file)
-        cmd = f"sox --info f1 \n".split()
-        cmd[2] = file
+file = "Pablo Casals-06-Bach _ Partita No.1 In B Flat Major BWV.825 - IV. Sarabande.mp3"
+# cmd = f"sox --info f1 \n".split()
+# cmd[2] = file
+output_flac = "bach_sarabande.flac"
+cmd = "sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 100000 -L -b 0 vol 4".split()
+cmd[cmd.index("input")] = file
+cmd[cmd.index("output")] = output_flac
+cmd[cmd.index("sample_target")] = "176400"
 
-        result = subprocess.run(cmd, capture_output=True)
-        print(result.stdout.decode())
-        res = [item.decode("utf-8") for item in result.stdout.split()]
-        print(res)
-        sample_rates.append(res[res.index("Rate") + 2])
+result = subprocess.run(cmd, capture_output=True)
+print(0, result.returncode)
+print(1, result.stdout.decode())
+print(2, result.stderr.decode())
+# res = [item.decode("utf-8") for item in result.stdout.split()]
+# print(res)
+# sample_rates.append(res[res.index("Rate") + 2])
         
 
-print(sample_rates)
+# print(sample_rates)

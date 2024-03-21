@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import multiprocessing
+from collections import Counter
 
 
 # root directory for music
@@ -10,11 +11,14 @@ OUT_DIR = "/mnt/f/HiRes"
 EXCLUDE_DIRS = ["__MACOSX"]
 INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu dat dvms f32 f4 f64 f8 flac fssd gsrt hcom htk ima ircam la lpc lpc10 lu maud mp2 mp3 nist prc raw s1 s16 s2 s24 s3 s32 s4 s8 sb sf sl sln smp snd sndr sndt sou sox sph sw txw u1 u16 u2 u24 u3 u32 u4 u8 ub ul uw vms voc vox wav wavpcm wve xa".split()
 
-
-file_lock = multiprocessing.Lock()
+# manager = multiprocessing.Manager()
+history_file_lock = multiprocessing.Lock()
+history_file = os.path.join(OUT_DIR, "history.txt")
+history_readonly = set() # should be used as read-only unless during init
 
 if not IN_DIR.startswith("/"):
     print("Use absolute path for argument.")
+    sys.exit(1)
 
 
 def get_all_files(parent_dir):
@@ -43,12 +47,13 @@ def digest_input(path):
     
     Note: It can also be used for finding output_dir.
     '''
-    relative_path = path[len(IN_DIR):]
+    relative_path = path[len(IN_DIR):].lstrip('/')
     transplanted_input = os.path.join(OUT_DIR, relative_path)
     file_parts = transplanted_input.split(".")
     input_extension = file_parts[-1]
     file_parts[-1] = "flac"
     output_flac = ".".join(file_parts)
+    # print("outoutput_flac)
     return transplanted_input, input_extension, output_flac
 
 
@@ -77,53 +82,79 @@ def find_sample_rate(file):
     
 
 def upsample_sinc(input):
-    transplanted_input, input_extension, output_flac  = digest_input(input)
-    # do not perform upsampling
-    if input_extension not in INPUT_FORMATS:
-        if os.path.exists(transplanted_input):
-            print(transplanted_input, "already exists")
+    try:
+        transplanted_input, input_extension, output_flac  = digest_input(input)
+        # do not perform upsampling
+        if input_extension not in INPUT_FORMATS:
+            if transplanted_input in history_readonly:
+                print(transplanted_input, "already exists")
+                return
+            cmd = f"cp input output".split()
+            cmd[cmd.index("input")] = input
+            cmd[cmd.index("output")] = transplanted_input
+            result = subprocess.run(cmd, capture_output=True)
+            if result.returncode > 0:
+                raise RuntimeError(f"When doing cp command: {result.stderr.decode()}")
             return
-        cmd = f"cp input output".split()
+        
+        if output_flac in history_readonly:
+            print(output_flac, "already exists")
+            return
+        
+        # 4x upsampling for PI2AES interface limit
+        sample_rate = find_sample_rate(input)
+        sample_target = 192000
+        if sample_rate % 44100 == 0:
+            sample_target = 176400
+
+        cmd = "sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
         cmd[cmd.index("input")] = input
-        cmd[cmd.index("output")] = transplanted_input
+        cmd[cmd.index("output")] = output_flac
+        cmd[cmd.index("sample_target")] = str(sample_target)
+        print("Making...", output_flac)
         result = subprocess.run(cmd, capture_output=True)
-        print(result.stderr.decode())
-        return
+        if result.returncode > 0:
+                raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
+        
+        # write mark of completion in history_file
+        with history_file_lock:
+            with open(history_file, 'a') as f:
+                f.write(f"{output_flac}\n")
+        print("Completed", output_flac)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        print("input", input, file=sys.stderr)
+        print("output", output_flac, file=sys.stderr)
+        return False
+    return True
     
-    if os.path.exists(output_flac):
-        print(output_flac, "already exists")
-        return
+
+if __name__ == "__main__":
     
-    sample_rate = find_sample_rate(input)
-    sample_target = 192000
-    if sample_rate % 44100 == 0:
-        sample_target = 176400
+    all_files, all_dir = get_all_files(IN_DIR)
+    create_directories(all_dir)
+    
+    # read in history.txt
+    # this history file keeps track of jobs that were completed, or were in-progress
+    # state in-progress means that script crashed or was killed before output file was finalized
+    # Ultimately, this lets us know which output files should be overwritten since they are corrupted
+    if os.path.exists(history_file):
+        with open(history_file, 'r') as file:
+            lines = file.readlines()
+            history_readonly.update(lines)
+    
+    num_processes = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes=num_processes)
+    
+    results = pool.map(upsample_sinc, all_files)
+    pool.close()
+    pool.join()
 
+    successes = Counter(results)
+    print("Success rate:", successes[True], "/", len(results))
 
-    cmd = "sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
-    cmd[cmd.index("input")] = input
-    cmd[cmd.index("output")] = output_flac
-    cmd[cmd.index("sample_target")] = str(sample_target)
-    print("Making...", output_flac)
-    result = subprocess.run(cmd, capture_output=True)
-    print(result.stdout.decode())
-
-
-all_files, all_dir = get_all_files(IN_DIR)
-create_directories(all_dir)
-
-for f in all_files:
-    upsample_sinc(f)
-
-
-
-# logging and tests
-new_files, new_dir = get_all_files(OUT_DIR)
-
-for dir in all_dir:
-    print(dir)
-print(len(all_dir))
-
-for dir in new_dir:
-    print(dir)
-print(len(new_dir))
+    # # logging and tests
+    # new_files, new_dir = get_all_files(OUT_DIR)
+    # for dir in new_dir:
+    #     print(dir)
+    # print(len(new_dir), len(all_dir), len(new_files), len(all_files))
