@@ -12,17 +12,47 @@ OUT_DIR = "/mnt/f/HiRes"
 EXCLUDE_DIRS = ["__MACOSX"]
 INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu dat dvms f32 f4 f64 f8 flac fssd gsrt hcom htk ima ircam la lpc lpc10 lu maud mp2 mp3 nist prc raw s1 s16 s2 s24 s3 s32 s4 s8 sb sf sl sln smp snd sndr sndt sou sox sph sw txw u1 u16 u2 u24 u3 u32 u4 u8 ub ul uw vms voc vox wav wavpcm wve xa".split()
 
+
 # manager = multiprocessing.Manager()
 history_file_lock = multiprocessing.Lock()
 history_file = os.path.join(OUT_DIR, "history.txt")
 history_readonly = set() # should be used as read-only unless during init
 
-info_log = open("info.log", 'a')
-error_log = open("error.log", 'a')
 
+logger_info_lock = multiprocessing.Lock()
+logger_error_lock = multiprocessing.Lock()
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s :: %(name)s :: %(levelname)-8s :: %(message)s')
+formatter.datefmt = '%Y-%m-%d %H:%M:%S'
+
+# Create a file handler for info logs
+info_handler = logging.FileHandler("info.log")
+info_handler.setFormatter(formatter)
+info_handler.setLevel(logging.INFO)
+
+# Create a file handler for error logs
+error_handler = logging.FileHandler("error.log")
+error_handler.setFormatter(formatter)
+error_handler.setLevel(logging.ERROR)
+
+# Add handlers to the logger
+logger.addHandler(info_handler)
+logger.addHandler(error_handler)
+
+
+def log_info(msg):
+    with logger_info_lock:
+        logger.info(msg)
+
+
+def log_error(msg):
+    with logger_error_lock:
+        logger.error(msg)
+            
 
 if not IN_DIR.startswith("/"):
-    print("Use absolute path for argument.")
+    log_error("Use absolute path for arugment.")
     sys.exit(1)
 
 
@@ -58,7 +88,6 @@ def digest_input(path):
     input_extension = file_parts[-1]
     file_parts[-1] = "flac"
     output_flac = ".".join(file_parts)
-    # print("outoutput_flac)
     return transplanted_input, input_extension, output_flac
 
 
@@ -92,19 +121,19 @@ def upsample_sinc(input):
         # do not perform upsampling
         if input_extension not in INPUT_FORMATS:
             if transplanted_input in history_readonly:
-                print(transplanted_input, "already exists")
-                return
+                log_info(f"{transplanted_input} already exists. Skipping..")
+                return True
             cmd = f"cp input output".split()
             cmd[cmd.index("input")] = input
             cmd[cmd.index("output")] = transplanted_input
             result = subprocess.run(cmd, capture_output=True)
             if result.returncode > 0:
                 raise RuntimeError(f"When doing cp command: {result.stderr.decode()}")
-            return
+            return True
         
         if output_flac in history_readonly:
-            print(output_flac, "already exists")
-            return
+            log_info(f"{output_flac} already exists. Skipping..")
+            return True
         
         # 4x upsampling for PI2AES interface limit
         sample_rate = find_sample_rate(input)
@@ -116,7 +145,7 @@ def upsample_sinc(input):
         cmd[cmd.index("input")] = input
         cmd[cmd.index("output")] = output_flac
         cmd[cmd.index("sample_target")] = str(sample_target)
-        print("Making...", output_flac)
+        log_info(f"Making... {output_flac}")
         result = subprocess.run(cmd, capture_output=True)
         if result.returncode > 0:
                 raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
@@ -125,11 +154,11 @@ def upsample_sinc(input):
         with history_file_lock:
             with open(history_file, 'a') as f:
                 f.write(f"{output_flac}\n")
-        print("Completed", output_flac)
+        log_info(f"Completed {output_flac}")
     except Exception as e:
-        print(e, file=sys.stderr)
-        print("input", input, file=sys.stderr)
-        print("output", output_flac, file=sys.stderr)
+        log_error(f"input: {input}")
+        log_error(f"output: {output_flac}")
+        log_error(f"{e}")
         return False
     return True
     
@@ -156,7 +185,7 @@ if __name__ == "__main__":
     pool.join()
 
     successes = Counter(results)
-    print("Success rate:", successes[True], "/", len(results))
+    log_info(f"Success rate: {successes[True]} / {len(results)}")
 
     # # logging and tests
     # new_files, new_dir = get_all_files(OUT_DIR)
