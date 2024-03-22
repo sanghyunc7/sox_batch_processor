@@ -3,6 +3,7 @@ import sys
 import subprocess
 import multiprocessing
 import logging
+from datetime import datetime
 from collections import Counter
 
 
@@ -23,22 +24,39 @@ logger_info_lock = multiprocessing.Lock()
 logger_error_lock = multiprocessing.Lock()
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s :: %(name)s :: %(levelname)-8s :: %(message)s')
+formatter = logging.Formatter('%(asctime)s :: %(levelname)-8s :: %(message)s')
 formatter.datefmt = '%Y-%m-%d %H:%M:%S'
+current_time_str = datetime.now().strftime("%Y_%m_%d_%Hh_%Mm_%Ss")
 
 # Create a file handler for info logs
-info_handler = logging.FileHandler("info.log")
+info_handler = logging.FileHandler(f"logs/info_{current_time_str}.log")
 info_handler.setFormatter(formatter)
 info_handler.setLevel(logging.INFO)
 
 # Create a file handler for error logs
-error_handler = logging.FileHandler("error.log")
+error_handler = logging.FileHandler(f"logs/error_{current_time_str}.log")
 error_handler.setFormatter(formatter)
 error_handler.setLevel(logging.ERROR)
 
-# Add handlers to the logger
 logger.addHandler(info_handler)
 logger.addHandler(error_handler)
+
+
+# Create soft links to latest logs
+with open(f"logs/info_{current_time_str}.log", 'w') as file:
+    pass
+with open(f"logs/error_{current_time_str}.log", 'w') as file:
+    pass
+
+sym_info_link = "info.log"
+if os.path.exists(sym_info_link) and os.path.islink(sym_info_link):
+    os.unlink(sym_info_link)
+sym_error_link = "error.log"
+if os.path.exists(sym_error_link) and os.path.islink(sym_error_link):
+    os.unlink(sym_error_link)
+    
+os.symlink(f"logs/info_{current_time_str}.log", sym_info_link)
+os.symlink(f"logs/error_{current_time_str}.log", sym_error_link)
 
 
 def log_info(msg):
@@ -182,6 +200,8 @@ if __name__ == "__main__":
     
     num_processes = multiprocessing.cpu_count()
     pool = multiprocessing.Pool(processes=num_processes)
+    
+    log_info(f"\nAccording to the history file, we already processed {len(history_readonly)} / {len(all_files)} files.\n")
     
     results = pool.map(upsample_sinc, all_files)
     pool.close()
