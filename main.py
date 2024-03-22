@@ -52,7 +52,8 @@ def log_error(msg):
             
 
 if not IN_DIR.startswith("/"):
-    log_error("Use absolute path for arugment.")
+    log_error("Use absolute path for argument.")
+    print("Use absolute path for argument.")
     sys.exit(1)
 
 
@@ -103,7 +104,6 @@ def create_directories(all_dir):
         os.makedirs(output_dir, exist_ok=True)
 
 
-
 def find_sample_rate(file):
     cmd = f"sox --info input \n".split()
     # do this instead of f-strings because we don't want to split the "file" with spaces
@@ -114,6 +114,12 @@ def find_sample_rate(file):
     sample_rate = res[res.index("Rate") + 2] # "Rate", ":", "44100"
     return int(sample_rate)
     
+
+def write_history(msg):
+    with history_file_lock:
+        with open(history_file, 'a') as f:
+            f.write(f"{msg}\n")
+
 
 def upsample_sinc(input):
     try:
@@ -129,6 +135,7 @@ def upsample_sinc(input):
             result = subprocess.run(cmd, capture_output=True)
             if result.returncode > 0:
                 raise RuntimeError(f"When doing cp command: {result.stderr.decode()}")
+            write_history(transplanted_input)
             return True
         
         if output_flac in history_readonly:
@@ -151,14 +158,10 @@ def upsample_sinc(input):
                 raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
         
         # write mark of completion in history_file
-        with history_file_lock:
-            with open(history_file, 'a') as f:
-                f.write(f"{output_flac}\n")
+        write_history(output_flac)
         log_info(f"Completed {output_flac}")
     except Exception as e:
-        log_error(f"input: {input}")
-        log_error(f"output: {output_flac}")
-        log_error(f"{e}")
+        log_error(f"\ninput: {input}\noutput_flac: {output_flac}\nmessage: {e}")
         return False
     return True
     
@@ -174,7 +177,7 @@ if __name__ == "__main__":
     # Ultimately, this lets us know which output files should be overwritten since they are corrupted
     if os.path.exists(history_file):
         with open(history_file, 'r') as file:
-            lines = file.readlines()
+            lines = [line.lstrip().rstrip() for line in file.readlines()] # in particular, remove '\n' from line
             history_readonly.update(lines)
     
     num_processes = multiprocessing.cpu_count()
@@ -188,7 +191,5 @@ if __name__ == "__main__":
     log_info(f"Success rate: {successes[True]} / {len(results)}")
 
     # # logging and tests
-    # new_files, new_dir = get_all_files(OUT_DIR)
-    # for dir in new_dir:
-    #     print(dir)
-    # print(len(new_dir), len(all_dir), len(new_files), len(all_files))
+    new_files, new_dir = get_all_files(OUT_DIR)
+    print(len(new_dir), len(all_dir), len(new_files), len(all_files))
