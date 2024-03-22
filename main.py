@@ -43,6 +43,7 @@ logger.addHandler(error_handler)
 
 
 # Create soft links to latest logs
+os.makedirs("logs", exist_ok=True)
 with open(f"logs/info_{current_time_str}.log", 'w') as file:
     pass
 with open(f"logs/error_{current_time_str}.log", 'w') as file:
@@ -145,7 +146,7 @@ def upsample_sinc(input):
         # do not perform upsampling
         if input_extension not in INPUT_FORMATS:
             if transplanted_input in history_readonly:
-                log_info(f"{transplanted_input} already exists. Skipping..")
+                log_info(f"Skipping: {transplanted_input} already exists")
                 return True
             cmd = f"cp input output".split()
             cmd[cmd.index("input")] = input
