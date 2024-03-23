@@ -4,6 +4,7 @@ import subprocess
 import multiprocessing
 import logging
 from datetime import datetime
+from time import time
 from collections import Counter
 
 
@@ -18,7 +19,8 @@ INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu da
 history_file_lock = multiprocessing.Lock()
 history_file = os.path.join(OUT_DIR, "history.txt")
 history_readonly = set() # should be used as read-only unless during init
-
+progress = multiprocessing.Value('i', 0)  # share stack memory between processes
+monitor_state = multiprocessing.Value('b', True)
 
 logger_info_lock = multiprocessing.Lock()
 logger_error_lock = multiprocessing.Lock()
@@ -60,19 +62,22 @@ os.symlink(f"logs/info_{current_time_str}.log", sym_info_link)
 os.symlink(f"logs/error_{current_time_str}.log", sym_error_link)
 
 
-def log_info(msg):
+def log_info(msg, stdout=True):
     with logger_info_lock:
         logger.info(msg)
+    if stdout:
+        print(msg)
 
 
-def log_error(msg):
+def log_error(msg, stderr=False):
     with logger_error_lock:
         logger.error(msg)
+    if stderr:
+        print(msg, file=sys.stderr)
             
 
 if not IN_DIR.startswith("/"):
-    log_error("Use absolute path for argument.")
-    print("Use absolute path for argument.")
+    log_error("Use absolute path for argument.", stderr=True)
     sys.exit(1)
 
 
@@ -158,7 +163,7 @@ def upsample_sinc(input):
             return True
         
         if output_flac in history_readonly:
-            log_info(f"{output_flac} already exists. Skipping..")
+            log_info(f"Skipping: {output_flac} already exists")
             return True
         
         # 4x upsampling for PI2AES interface limit
@@ -183,10 +188,34 @@ def upsample_sinc(input):
         log_error(f"\ninput: {input}\noutput_flac: {output_flac}\nmessage: {e}")
         return False
     return True
+
+
+# it is okay if the data gets stale by the time the function result is used
+def get_progress():
+    global progress
+    with progress.get_lock():
+        return progress.value
     
+def get_monitor_state():
+    global monitor_state
+    with monitor_state.get_lock():
+        return monitor_state.value
+
+def task(i, input, length):
+    if i == 0:
+        # designate process as monitor
+        while get_monitor_state():
+            print(f"{get_progress()} / {length - 1}") # do not include monitor task as part of todos
+            if get_progress() == length - 1:
+                break
+            time.sleep(2)
+        print("Done monitor.")
+    else:
+        result = upsample_sinc(input)
+        
+        return result
 
 if __name__ == "__main__":
-    
     all_files, all_dir = get_all_files(IN_DIR)
     create_directories(all_dir)
     
@@ -198,18 +227,22 @@ if __name__ == "__main__":
         with open(history_file, 'r') as file:
             lines = [line.lstrip().rstrip() for line in file.readlines()] # in particular, remove '\n' from line
             history_readonly.update(lines)
+    log_info(f"\nAccording to the history file, we already processed {len(history_readonly)} / {len(all_files)} files.\n", stdout=True)
     
-    num_processes = multiprocessing.cpu_count()
+    num_processes = multiprocessing.cpu_count() + 1 # 1 extra for monitor
     pool = multiprocessing.Pool(processes=num_processes)
     
-    log_info(f"\nAccording to the history file, we already processed {len(history_readonly)} / {len(all_files)} files.\n")
     
-    results = pool.map(upsample_sinc, all_files)
+    tasks = ["monitor"] + all_files
+    
+    log_info(f"See info.log and error.log for progress.")
+    results = pool.starmap(task, [(i, tasks[i], len(tasks)) for i in range(len(tasks))])
+    
     pool.close()
     pool.join()
 
     successes = Counter(results)
-    log_info(f"Success rate: {successes[True]} / {len(results)}")
+    log_info(f"Success rate: {successes[True]} / {len(results)}", stdout=True)
 
     # # logging and tests
     new_files, new_dir = get_all_files(OUT_DIR)
