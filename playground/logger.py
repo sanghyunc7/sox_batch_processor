@@ -21,7 +21,3 @@ logger.info(logger.getEffectiveLevel())
 
 # error:
 # world
-
-
-
-

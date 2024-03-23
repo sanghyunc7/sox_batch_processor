@@ -1,4 +1,3 @@
-
 import os
 import sys
 import subprocess
@@ -22,6 +21,6 @@ print(2, result.stderr.decode())
 # res = [item.decode("utf-8") for item in result.stdout.split()]
 # print(res)
 # sample_rates.append(res[res.index("Rate") + 2])
-        
+
 
 # print(sample_rates)

@@ -6,13 +6,13 @@ history_readonly = set()
 output_flac = "sample.flac"
 output_flac2 = "sample2.flac"
 
-with open(history_file, 'a') as f:
+with open(history_file, "a") as f:
     f.write(f"{output_flac}\n")
     f.write(f"{output_flac2}\n")
-    
+
 
 if os.path.exists(history_file):
-    with open(history_file, 'r') as file:
+    with open(history_file, "r") as file:
         lines = [line.lstrip().rstrip() for line in file.readlines()]
         history_readonly.update(lines)
 

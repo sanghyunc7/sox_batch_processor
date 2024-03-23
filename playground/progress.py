@@ -1,8 +1,8 @@
 import multiprocessing
 import time
 
-progress = multiprocessing.Value('i', 0)  # share stack memory between processes
-monitor_state = multiprocessing.Value('b', True)
+progress = multiprocessing.Value("i", 0)  # share stack memory between processes
+monitor_state = multiprocessing.Value("b", True)
 
 
 # it is okay if the data gets stale by the time the function result is used
@@ -10,7 +10,8 @@ def get_progress():
     global progress
     with progress.get_lock():
         return progress.value
-    
+
+
 def get_monitor_state():
     global monitor_state
     with monitor_state.get_lock():
@@ -37,12 +38,12 @@ def test(i):
         with progress.get_lock():
             progress.value += 1
             print(progress.value)
-    
-        
+
+
 if __name__ == "__main__":
     all_files = [i for i in range(20)]
     pool = multiprocessing.Pool(processes=4)
-    
+
     # Submit tasks asynchronously using apply_async
     results = pool.map(test, all_files)
     print(progress.value)

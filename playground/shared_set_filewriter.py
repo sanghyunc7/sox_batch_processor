@@ -1,5 +1,6 @@
 import multiprocessing
 import time
+
 # Create a lock for synchronization
 lock = multiprocessing.Lock()
 
@@ -11,20 +12,22 @@ manager = multiprocessing.Manager()
 # Create a shared set for processed items
 processed_items = manager.dict()
 
+
 def process_data(item):
     # Simulate processing time
     time.sleep(item)  # Assuming each item takes 'item' seconds to process
 
     # Write log to file
     with lock:
-        with open(log_file, 'a') as f:
+        with open(log_file, "a") as f:
             f.write(f"Processed item {item}\n")
 
     # Add the processed item to the shared set
     processed_items[item] = True
 
     # Example processing: doubling the item
-    return item * 2  
+    return item * 2
+
 
 if __name__ == "__main__":
     # Define the list of data to be processed
@@ -33,7 +36,6 @@ if __name__ == "__main__":
     # Create a multiprocessing pool with the number of desired worker processes
     num_processes = multiprocessing.cpu_count()  # Use number of CPU cores
     pool = multiprocessing.Pool(processes=num_processes)
-
 
     # Map the data processing function to the list of data
     results = pool.map(process_data, [item for item in data_list])

@@ -1,6 +1,7 @@
 import multiprocessing
 import time
 
+
 # Function to process an item of data
 def process_data(item, log_file, processed_items, lock):
     # Simulate processing time
@@ -8,7 +9,7 @@ def process_data(item, log_file, processed_items, lock):
 
     # Write log to file
     with lock:
-        with open(log_file, 'a') as f:
+        with open(log_file, "a") as f:
             f.write(f"Processed item {item}\n")
 
     # Add the processed item to the shared set
@@ -16,7 +17,8 @@ def process_data(item, log_file, processed_items, lock):
         processed_items.add(item)
 
     # Example processing: doubling the item
-    return item * 2  
+    return item * 2
+
 
 if __name__ == "__main__":
     # Define the list of data to be processed
@@ -38,7 +40,9 @@ if __name__ == "__main__":
     log_file = "processing_logs.txt"
 
     # Map the data processing function to the list of data
-    results = pool.starmap(process_data, [(item, log_file, processed_items, lock) for item in data_list])
+    results = pool.starmap(
+        process_data, [(item, log_file, processed_items, lock) for item in data_list]
+    )
 
     # Close the pool to prevent further tasks from being submitted
     pool.close()

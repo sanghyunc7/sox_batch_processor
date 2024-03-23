@@ -12,6 +12,7 @@ def my_function():
         # This block is executed if no exception occurs in the try block
         return True
 
+
 # Example usage
 result = my_function()
 print(result)  # Output: False

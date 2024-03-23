@@ -3,17 +3,20 @@ import multiprocessing
 # Create a lock object
 file_lock = multiprocessing.Lock()
 
+
 def write_to_file(filename, data):
     # Acquire the lock before writing to the file
     with file_lock:
-        with open(filename, 'a') as f:
+        with open(filename, "a") as f:
             f.write(data)
-            f.write('\n')  # Ensure data is written on a new line
+            f.write("\n")  # Ensure data is written on a new line
+
 
 # Example usage in multiple processes
 def process_function(process_id):
     for i in range(50):
-        write_to_file('shared_file.txt', f'Process {process_id} - Line {i}')
+        write_to_file("shared_file.txt", f"Process {process_id} - Line {i}")
+
 
 # Create and start multiple processes
 processes = []
