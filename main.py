@@ -207,13 +207,12 @@ def upsample_sinc(input):
         cmd[cmd.index("sample_target")] = str(sample_target)
         log_info(f"Making... {output_flac}")
 
-        result = 0
         if TEST:
             time.sleep(0.001)
-        elif not TEST:
-            result = subprocess.run(cmd, capture_output=True).returncode
-        if result > 0:
-            raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
+        else:
+            result = subprocess.run(cmd, capture_output=True)
+            if result.returncode > 0:
+                raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
 
         # write mark of completion in HISTORY_FILE
         write_history(output_flac)
