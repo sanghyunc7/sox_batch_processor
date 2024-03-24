@@ -26,13 +26,16 @@ EXCLUDE_DIRS = ["__MACOSX"]
 INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu dat dvms f32 f4 f64 f8 flac fssd gsrt hcom htk ima ircam la lpc lpc10 lu maud mp2 mp3 nist prc raw s1 s16 s2 s24 s3 s32 s4 s8 sb sf sl sln smp snd sndr sndt sou sox sph sw txw u1 u16 u2 u24 u3 u32 u4 u8 ub ul uw vms voc vox wav wavpcm wve xa".split()
 
 
+start_time = time.time()
 history_file = os.path.join(OUT_DIR, "history.txt")
 
 # shared memory between processes
 # they should be initialized by main, then passed as arguments during child process creation
 # those arguments should then be used to initialize the respective variables in the child process memory stack
 # history_readonly doesn't have to follow this flow, as it technically does not have to be the same between processes (although it should)
-logger = logger_lock = queue = history_readonly = history_file_lock = None
+logger = logger_lock = queue = history_readonly = history_file_lock = (
+    timestamp_offset
+) = None
 
 
 # should only be called by main
@@ -157,10 +160,18 @@ def find_sample_rate(file):
     return sample_rate
 
 
+def get_time_passed():
+    time_passed = time.time() - start_time + timestamp_offset
+    hours, remainder = divmod(time_passed, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return int(time_passed), int(hours), int(minutes), int(seconds)
+
+
 def write_history(msg):
     with history_file_lock:
         with open(history_file, "a") as f:
-            f.write(f"{msg}\n")
+            time_passed, g1, g2, g3 = get_time_passed()
+            f.write(f"{time_passed} {msg}\n")
 
 
 def upsample_sinc(input):
@@ -216,14 +227,23 @@ def upsample_sinc(input):
 
 
 # this wrapper helps to assign the arguments to variables with global scope
-def task(input, mlogger, mlogger_lock, mqueue, mhistory_readonly, mhistory_file_lock):
-    global logger, logger_lock, queue, history_readonly, history_file_lock
+def task(
+    input,
+    mlogger,
+    mlogger_lock,
+    mqueue,
+    mhistory_readonly,
+    mhistory_file_lock,
+    mtimestamp_offset,
+):
+    global logger, logger_lock, queue, history_readonly, history_file_lock, timestamp_offset
 
     logger = mlogger
     logger_lock = mlogger_lock
     queue = mqueue
     history_readonly = mhistory_readonly
     history_file_lock = mhistory_file_lock
+    timestamp_offset = mtimestamp_offset
 
     result = upsample_sinc(input)
     # print(result)
@@ -234,28 +254,17 @@ def task(input, mlogger, mlogger_lock, mqueue, mhistory_readonly, mhistory_file_
 # only for that single process assigned to be the monitor
 success = 0
 fail = 0
-start_time = time.time()
-
-
-# bug? timer will "reset" in-between runs
-# or be inaccurate when the pc is put to sleep during the run
-def get_time_passed():
-    time_passed = time.time() - start_time
-
-    # Calculate hours, minutes, and seconds
-    hours, remainder = divmod(time_passed, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return int(hours), int(minutes), int(seconds)
 
 
 # a realtime monitor to view quick summaries on stdout
-def monitor(mlogger, mlogger_lock, mqueue, total_tasks):
-    global logger, logger_lock, queue
+def monitor(mlogger, mlogger_lock, mqueue, mtimestamp_offset, total_tasks):
+    global logger, logger_lock, queue, timestamp_offset
     global success, fail  # unique to monitor
 
     logger = mlogger
     logger_lock = mlogger_lock
     queue = mqueue
+    timestamp_offset = mtimestamp_offset
 
     while True:
         item = queue.get()  # block until queue is not empty
@@ -263,7 +272,7 @@ def monitor(mlogger, mlogger_lock, mqueue, total_tasks):
             success += 1
         else:
             fail += 1
-        hours, minutes, seconds = get_time_passed()
+        g1, hours, minutes, seconds = get_time_passed()
         print(
             f"{success} successful | {fail} failed | {total_tasks} total tasks | Time passed: {hours:02d}h:{minutes:02d}m:{seconds:02d}s"
         )
@@ -290,21 +299,29 @@ if __name__ == "__main__":
     # this history file keeps track of jobs that were completed, or were in-progress
     # state in-progress means that script crashed or was killed before output file was finalized
     # Ultimately, this lets us know which output files should be overwritten since they are corrupted
+    timestamp_offset = 0
     if os.path.exists(history_file):
         with open(history_file, "r") as file:
-            lines = [
-                line.lstrip().rstrip() for line in file.readlines()
-            ]  # in particular, remove '\n' from line
-            history_readonly.update(lines)
+            lines = file.readlines()
+            song_offset = lines[-1].index(OUT_DIR)
+
+            for line in lines:
+                line = line.rstrip()  # of the \n in particular
+                timestamp_offset = max(timestamp_offset, int(line[:song_offset]))
+                history_readonly.add(line[song_offset:])
+
         log_info(
             f"\nAccording to the history file, we already processed {len(history_readonly)} / {len(all_files)} files.\n",
             stdout=True,
         )
+
     num_processes = multiprocessing.cpu_count() + 1  # 1 extra for monitor
     pool = multiprocessing.Pool(processes=num_processes)
 
     time.sleep(3)
-    pool.apply_async(monitor, (logger, logger_lock, queue, len(all_files)))
+    pool.apply_async(
+        monitor, (logger, logger_lock, queue, timestamp_offset, len(all_files))
+    )
     results = pool.starmap_async(
         task,
         [
@@ -315,6 +332,7 @@ if __name__ == "__main__":
                 queue,
                 history_readonly,
                 history_file_lock,
+                timestamp_offset,
             )
             for i in range(len(all_files))
         ],
