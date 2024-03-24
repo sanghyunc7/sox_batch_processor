@@ -44,7 +44,7 @@ if __name__ == "__main__":
             pool.starmap_async(producer, [(queue, i) for i in range(n)])
 
             # Give some time for the tasks to execute concurrently
-            pool.close()
-            pool.join()
-            print("main exiting")
+            # pool.close()
+            # pool.join()
+    print("main exiting")
             # time.sleep(1)

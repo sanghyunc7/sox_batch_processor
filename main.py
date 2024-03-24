@@ -16,14 +16,9 @@ INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu da
 
 
 # manager = multiprocessing.Manager()
-history_file_lock = multiprocessing.Lock()
 history_file = os.path.join(OUT_DIR, "history.txt")
 history_readonly = set()  # should be used as read-only unless during init
-progress = multiprocessing.Value("i", 0)  # share stack memory between processes
-monitor_state = multiprocessing.Value("b", True)
 
-logger_info_lock = multiprocessing.Lock()
-logger_error_lock = multiprocessing.Lock()
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(asctime)s :: %(levelname)-8s :: %(message)s")
@@ -190,34 +185,27 @@ def upsample_sinc(input):
     return True
 
 
-# it is okay if the data gets stale by the time the function result is used
-def get_progress():
-    global progress
-    with progress.get_lock():
-        return progress.value
+def task(input, queue, history_file_lock, logger_info_lock, logger_error_lock):
+    result = upsample_sinc(input, history_file_lock, logger_info_lock, logger_error_lock)
+    queue.put(result)
+    return result
 
 
-def get_monitor_state():
-    global monitor_state
-    with monitor_state.get_lock():
-        return monitor_state.value
-
-
-def task(i, input, length):
-    if i == 0:
-        # designate process as monitor
-        while get_monitor_state():
-            print(
-                f"{get_progress()} / {length - 1}"
-            )  # do not include monitor task as part of todos
-            if get_progress() == length - 1:
-                break
-            time.sleep(2)
-        print("Done monitor.")
-    else:
-        result = upsample_sinc(input)
-
-        return result
+# only for single instance of monitor
+success = 0
+fail = 0
+def monitor(queue, total_tasks):
+    global success, fail
+    while True:
+        item = queue.get()
+        if item:
+            success += 1
+        else:
+            fail += 1
+        print(f"{success} successful | {fail} failed | {total_tasks} total tasks")
+        if success + fail == total_tasks:
+            print("Monitor done.")
+            break
 
 
 if __name__ == "__main__":
@@ -238,14 +226,21 @@ if __name__ == "__main__":
         f"\nAccording to the history file, we already processed {len(history_readonly)} / {len(all_files)} files.\n",
         stdout=True,
     )
-
+    
+    
     num_processes = multiprocessing.cpu_count() + 1  # 1 extra for monitor
     pool = multiprocessing.Pool(processes=num_processes)
-
-    tasks = ["monitor"] + all_files
-
+    manager = multiprocessing.Manager()
+    
+    queue = manager.Queue()
+    history_file_lock = manager.Lock()
+    logger_info_lock = manager.Lock()
+    logger_error_lock = manager.Lock()
+    
     log_info(f"See info.log and error.log for progress.")
-    results = pool.starmap(task, [(i, tasks[i], len(tasks)) for i in range(len(tasks))])
+    results = pool.starmap_async(task, [(all_files[i], queue, history_file_lock, logger_info_lock, logger_error_lock) for i in range(len(all_files))])
+    results.append(pool.starmap_async(monitor, [queue, len(all_files)]))
+    
 
     pool.close()
     pool.join()
