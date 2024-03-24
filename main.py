@@ -26,8 +26,8 @@ EXCLUDE_DIRS = ["__MACOSX"]
 INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu dat dvms f32 f4 f64 f8 flac fssd gsrt hcom htk ima ircam la lpc lpc10 lu maud mp2 mp3 nist prc raw s1 s16 s2 s24 s3 s32 s4 s8 sb sf sl sln smp snd sndr sndt sou sox sph sw txw u1 u16 u2 u24 u3 u32 u4 u8 ub ul uw vms voc vox wav wavpcm wve xa".split()
 
 
-start_time = time.time()
-history_file = os.path.join(OUT_DIR, "history.txt")
+START_TIME = time.time()
+HISTORY_FILE = os.path.join(OUT_DIR, "history.txt")
 
 # shared memory between processes
 # they should be initialized by main, then passed as arguments during child process creation
@@ -161,7 +161,7 @@ def find_sample_rate(file):
 
 
 def get_time_passed():
-    time_passed = time.time() - start_time + timestamp_offset
+    time_passed = time.time() - START_TIME + timestamp_offset
     hours, remainder = divmod(time_passed, 3600)
     minutes, seconds = divmod(remainder, 60)
     return int(time_passed), int(hours), int(minutes), int(seconds)
@@ -169,7 +169,7 @@ def get_time_passed():
 
 def write_history(msg):
     with history_file_lock:
-        with open(history_file, "a") as f:
+        with open(HISTORY_FILE, "a") as f:
             time_passed, g1, g2, g3 = get_time_passed()
             f.write(f"{time_passed} {msg}\n")
 
@@ -215,7 +215,7 @@ def upsample_sinc(input):
         if result > 0:
             raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
 
-        # write mark of completion in history_file
+        # write mark of completion in HISTORY_FILE
         write_history(output_flac)
         log_info(f"Completed {output_flac}")
     except Exception as e:
@@ -299,8 +299,8 @@ if __name__ == "__main__":
     # state in-progress means that script crashed or was killed before output file was finalized
     # Ultimately, this lets us know which output files should be overwritten since they are corrupted
     timestamp_offset = 0
-    if os.path.exists(history_file):
-        with open(history_file, "r") as file:
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, "r") as file:
             lines = file.readlines()
             for line in lines:
                 song_offset = line.index(OUT_DIR)
