@@ -3,80 +3,96 @@ import sys
 import subprocess
 import multiprocessing
 import logging
+import time
+import traceback
 from datetime import datetime
-from time import time
 from collections import Counter
 
+TEST = True
 
 # root directory for music
-IN_DIR = sys.argv[1]
+IN_DIR = "/mnt/f/Music"
+if len(sys.argv) > 1:
+    IN_DIR = sys.argv[1]
+if not IN_DIR.startswith("/"):
+    print("Use absolute path for argument.")
+    sys.exit(1)
+
 OUT_DIR = "/mnt/f/HiRes"
+if TEST:
+    OUT_DIR = "/home/dan/test_music2"
+
 EXCLUDE_DIRS = ["__MACOSX"]
 INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu dat dvms f32 f4 f64 f8 flac fssd gsrt hcom htk ima ircam la lpc lpc10 lu maud mp2 mp3 nist prc raw s1 s16 s2 s24 s3 s32 s4 s8 sb sf sl sln smp snd sndr sndt sou sox sph sw txw u1 u16 u2 u24 u3 u32 u4 u8 ub ul uw vms voc vox wav wavpcm wve xa".split()
 
 
-# manager = multiprocessing.Manager()
 history_file = os.path.join(OUT_DIR, "history.txt")
-history_readonly = set()  # should be used as read-only unless during init
 
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(asctime)s :: %(levelname)-8s :: %(message)s")
-formatter.datefmt = "%Y-%m-%d %H:%M:%S"
-current_time_str = datetime.now().strftime("%Y_%m_%d_%Hh_%Mm_%Ss")
-
-# Create a file handler for info logs
-info_handler = logging.FileHandler(f"logs/info_{current_time_str}.log")
-info_handler.setFormatter(formatter)
-info_handler.setLevel(logging.INFO)
-
-# Create a file handler for error logs
-error_handler = logging.FileHandler(f"logs/error_{current_time_str}.log")
-error_handler.setFormatter(formatter)
-error_handler.setLevel(logging.ERROR)
-
-logger.addHandler(info_handler)
-logger.addHandler(error_handler)
+# shared memory between processes
+# they should be initialized by main, then passed as arguments during child process creation
+# those arguments should then be used to initialize the respective variables in the child process memory stack
+# history_readonly doesn't have to follow this flow, as it technically does not have to be the same between processes (although it should)
+logger = logger_lock = queue = history_readonly = history_file_lock = None
 
 
-# Create soft links to latest logs
-os.makedirs("logs", exist_ok=True)
-with open(f"logs/info_{current_time_str}.log", "w") as file:
-    pass
-with open(f"logs/error_{current_time_str}.log", "w") as file:
-    pass
+# should only be called by main
+def logger_init():
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(asctime)s :: %(levelname)-8s :: %(message)s")
+    formatter.datefmt = "%Y-%m-%d %H:%M:%S"
+    current_time_str = datetime.now().strftime("%Y_%m_%d_%Hh_%Mm_%Ss")
 
-sym_info_link = "info.log"
-if os.path.exists(sym_info_link) and os.path.islink(sym_info_link):
-    os.unlink(sym_info_link)
-sym_error_link = "error.log"
-if os.path.exists(sym_error_link) and os.path.islink(sym_error_link):
-    os.unlink(sym_error_link)
+    # Create a file handler for info logs
+    info_handler = logging.FileHandler(f"logs/info_{current_time_str}.log")
+    info_handler.setFormatter(formatter)
+    info_handler.setLevel(logging.INFO)
 
-os.symlink(f"logs/info_{current_time_str}.log", sym_info_link)
-os.symlink(f"logs/error_{current_time_str}.log", sym_error_link)
+    # Create a file handler for error logs
+    error_handler = logging.FileHandler(f"logs/error_{current_time_str}.log")
+    error_handler.setFormatter(formatter)
+    error_handler.setLevel(logging.ERROR)
+
+    logger.addHandler(info_handler)
+    logger.addHandler(error_handler)
+
+    # Create soft links to latest logs
+    os.makedirs("logs", exist_ok=True)
+    # create files but leave empty
+    with open(f"logs/info_{current_time_str}.log", "w") as file:
+        pass
+    with open(f"logs/error_{current_time_str}.log", "w") as file:
+        pass
+
+    sym_info_link = "info.log"
+    if os.path.exists(sym_info_link) and os.path.islink(sym_info_link):
+        os.unlink(sym_info_link)
+    sym_error_link = "error.log"
+    if os.path.exists(sym_error_link) and os.path.islink(sym_error_link):
+        os.unlink(sym_error_link)
+
+    os.symlink(f"logs/info_{current_time_str}.log", sym_info_link)
+    os.symlink(f"logs/error_{current_time_str}.log", sym_error_link)
+
+    return logger
 
 
-def log_info(msg, stdout=True):
-    with logger_info_lock:
+def log_info(msg, stdout=False):
+    with logger_lock:
         logger.info(msg)
-    if stdout:
-        print(msg)
+        if stdout:
+            print(msg)
 
 
 def log_error(msg, stderr=False):
-    with logger_error_lock:
+    with logger_lock:
         logger.error(msg)
-    if stderr:
-        print(msg, file=sys.stderr)
-
-
-if not IN_DIR.startswith("/"):
-    log_error("Use absolute path for argument.", stderr=True)
-    sys.exit(1)
+        if stderr:
+            print(msg, file=sys.stderr)
 
 
 def get_all_files(parent_dir):
+    log_info(f"Finding all files of {parent_dir}..")
     # List to hold all file paths
     all_dir = []
     all_files = []
@@ -89,6 +105,7 @@ def get_all_files(parent_dir):
             file_path = os.path.join(root, file)
             all_files.append(file_path)
 
+    log_info(f"Found all {len(all_files)} files and {len(all_dir)} directories.")
     return all_files, all_dir
 
 
@@ -124,14 +141,20 @@ def create_directories(all_dir):
 
 
 def find_sample_rate(file):
-    cmd = f"sox --info input \n".split()
-    # do this instead of f-strings because we don't want to split the "file" with spaces
-    cmd[cmd.index("input")] = file
+    sample_rate = 176400
+    try:
+        cmd = f"sox --info input".split()
+        # do this instead of f-strings because we don't want to split the "file" with spaces
+        cmd[cmd.index("input")] = file
 
-    result = subprocess.run(cmd, capture_output=True)
-    res = [item.decode("utf-8") for item in result.stdout.split()]
-    sample_rate = res[res.index("Rate") + 2]  # "Rate", ":", "44100"
-    return int(sample_rate)
+        result = subprocess.run(cmd, capture_output=True)
+        res = [item.decode("utf-8") for item in result.stdout.split()]
+        sample_rate = int(res[res.index("Rate") + 2])  # "Rate", ":", "44100"
+    except Exception as e:
+        log_error(
+            f"\ninput: {file}\nmessage: {e}\n{traceback.format_exc()}"
+        )  # Traceback (most recent call last):
+    return sample_rate
 
 
 def write_history(msg):
@@ -162,9 +185,8 @@ def upsample_sinc(input):
             return True
 
         # 4x upsampling for PI2AES interface limit
-        sample_rate = find_sample_rate(input)
         sample_target = 192000
-        if sample_rate % 44100 == 0:
+        if find_sample_rate(input) % 44100 == 0:
             sample_target = 176400
 
         cmd = "sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
@@ -172,43 +194,93 @@ def upsample_sinc(input):
         cmd[cmd.index("output")] = output_flac
         cmd[cmd.index("sample_target")] = str(sample_target)
         log_info(f"Making... {output_flac}")
-        result = subprocess.run(cmd, capture_output=True)
-        if result.returncode > 0:
+
+        result = 0
+        if TEST:
+            time.sleep(0.001)
+        elif not TEST:
+            result = subprocess.run(cmd, capture_output=True).returncode
+        if result > 0:
             raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
 
         # write mark of completion in history_file
         write_history(output_flac)
         log_info(f"Completed {output_flac}")
     except Exception as e:
-        log_error(f"\ninput: {input}\noutput_flac: {output_flac}\nmessage: {e}")
+        log_error(
+            f"\ninput: {input}\noutput_flac: {output_flac}\nmessage: {e}\n{traceback.format_exc()}"
+        )
         return False
     return True
 
 
-def task(input, queue, history_file_lock, logger_info_lock, logger_error_lock):
-    result = upsample_sinc(input, history_file_lock, logger_info_lock, logger_error_lock)
+# this wrapper helps to assign the arguments to variables with global scope
+def task(input, mlogger, mlogger_lock, mqueue, mhistory_readonly, mhistory_file_lock):
+    global logger, logger_lock, queue, history_readonly, history_file_lock
+
+    logger = mlogger
+    logger_lock = mlogger_lock
+    queue = mqueue
+    history_readonly = mhistory_readonly
+    history_file_lock = mhistory_file_lock
+
+    result = upsample_sinc(input)
+    # print(result)
     queue.put(result)
     return result
 
 
-# only for single instance of monitor
+# only for that single process assigned to be the monitor
 success = 0
 fail = 0
-def monitor(queue, total_tasks):
-    global success, fail
+start_time = time.time()
+
+
+# bug? timer will "reset" in-between runs
+# or be inaccurate when the pc is put to sleep during the run
+def get_time_passed():
+    time_passed = time.time() - start_time
+
+    # Calculate hours, minutes, and seconds
+    hours, remainder = divmod(time_passed, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return int(hours), int(minutes), int(seconds)
+
+
+def monitor(mlogger, mlogger_lock, mqueue, total_tasks):
+    global logger, logger_lock, queue
+    global success, fail  # unique to monitor
+
+    logger = mlogger
+    logger_lock = mlogger_lock
+    queue = mqueue
+
     while True:
-        item = queue.get()
+        item = queue.get()  # block until queue is not empty
         if item:
             success += 1
         else:
             fail += 1
-        print(f"{success} successful | {fail} failed | {total_tasks} total tasks")
+        hours, minutes, seconds = get_time_passed()
+        print(
+            f"{success} successful | {fail} failed | {total_tasks} total tasks | Time passed: {hours:02d}h:{minutes:02d}m:{seconds:02d}s"
+        )
         if success + fail == total_tasks:
             print("Monitor done.")
             break
+    return True
 
 
 if __name__ == "__main__":
+    # create shared variables
+    manager = multiprocessing.Manager()
+    queue = manager.Queue()
+    history_file_lock = manager.Lock()
+    logger_lock = manager.Lock()
+    logger = logger_init()
+    log_info(f"See info.log and error.log for progress.", stdout=True)
+    history_readonly = set()
+
     all_files, all_dir = get_all_files(IN_DIR)
     create_directories(all_dir)
 
@@ -222,32 +294,39 @@ if __name__ == "__main__":
                 line.lstrip().rstrip() for line in file.readlines()
             ]  # in particular, remove '\n' from line
             history_readonly.update(lines)
-    log_info(
-        f"\nAccording to the history file, we already processed {len(history_readonly)} / {len(all_files)} files.\n",
-        stdout=True,
-    )
-    
-    
+        log_info(
+            f"\nAccording to the history file, we already processed {len(history_readonly)} / {len(all_files)} files.\n",
+            stdout=True,
+        )
     num_processes = multiprocessing.cpu_count() + 1  # 1 extra for monitor
     pool = multiprocessing.Pool(processes=num_processes)
-    manager = multiprocessing.Manager()
-    
-    queue = manager.Queue()
-    history_file_lock = manager.Lock()
-    logger_info_lock = manager.Lock()
-    logger_error_lock = manager.Lock()
-    
-    log_info(f"See info.log and error.log for progress.")
-    results = pool.starmap_async(task, [(all_files[i], queue, history_file_lock, logger_info_lock, logger_error_lock) for i in range(len(all_files))])
-    results.append(pool.starmap_async(monitor, [queue, len(all_files)]))
-    
 
+    time.sleep(3)
+    pool.apply_async(monitor, (logger, logger_lock, queue, len(all_files)))
+    results = pool.starmap_async(
+        task,
+        [
+            (
+                all_files[i],
+                logger,
+                logger_lock,
+                queue,
+                history_readonly,
+                history_file_lock,
+            )
+            for i in range(len(all_files))
+        ],
+    )
     pool.close()
     pool.join()
 
-    successes = Counter(results)
-    log_info(f"Success rate: {successes[True]} / {len(results)}", stdout=True)
+    results_list = results.get()
+    successes = Counter(results_list)
+    log_info(f"Success rate: {successes[True]} / {len(results_list)}", stdout=True)
 
     # # logging and tests
     new_files, new_dir = get_all_files(OUT_DIR)
-    print(len(new_dir), len(all_dir), len(new_files), len(all_files))
+    log_info(
+        f"{len(new_dir)} new directories, {len(all_dir)} old directories, {len(new_files)} new files, {len(all_files)} old files",
+        stdout=True,
+    )
