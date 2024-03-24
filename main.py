@@ -33,9 +33,9 @@ history_file = os.path.join(OUT_DIR, "history.txt")
 # they should be initialized by main, then passed as arguments during child process creation
 # those arguments should then be used to initialize the respective variables in the child process memory stack
 # history_readonly doesn't have to follow this flow, as it technically does not have to be the same between processes (although it should)
-logger = logger_lock = queue = history_readonly = history_file_lock = (
-    timestamp_offset
-) = None
+logger = logger_lock = queue = history_file_lock = None
+history_readonly = set()
+timestamp_offset = 0
 
 
 # should only be called by main
@@ -290,7 +290,6 @@ if __name__ == "__main__":
     logger_lock = manager.Lock()
     logger = logger_init()
     log_info(f"See info.log and error.log for progress.", stdout=True)
-    history_readonly = set()
 
     all_files, all_dir = get_all_files(IN_DIR)
     create_directories(all_dir)
