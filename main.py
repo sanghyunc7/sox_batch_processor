@@ -303,9 +303,8 @@ if __name__ == "__main__":
     if os.path.exists(history_file):
         with open(history_file, "r") as file:
             lines = file.readlines()
-            song_offset = lines[-1].index(OUT_DIR)
-
             for line in lines:
+                song_offset = line.index(OUT_DIR)
                 line = line.rstrip()  # of the \n in particular
                 timestamp_offset = max(timestamp_offset, int(line[:song_offset]))
                 history_readonly.add(line[song_offset:])
