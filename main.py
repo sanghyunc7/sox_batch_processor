@@ -8,9 +8,12 @@ import traceback
 from datetime import datetime
 from collections import Counter
 
-TEST = True
+TEST = False
+OUT_DIR = "/mnt/f/HiRes"
+if TEST:
+    OUT_DIR = "/home/dan/test_music2"
 
-# root directory for music
+# where is your music
 IN_DIR = "/mnt/f/Music"
 if len(sys.argv) > 1:
     IN_DIR = sys.argv[1]
@@ -18,9 +21,6 @@ if not IN_DIR.startswith("/"):
     print("Use absolute path for argument.")
     sys.exit(1)
 
-OUT_DIR = "/mnt/f/HiRes"
-if TEST:
-    OUT_DIR = "/home/dan/test_music2"
 
 EXCLUDE_DIRS = ["__MACOSX"]
 INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu dat dvms f32 f4 f64 f8 flac fssd gsrt hcom htk ima ircam la lpc lpc10 lu maud mp2 mp3 nist prc raw s1 s16 s2 s24 s3 s32 s4 s8 sb sf sl sln smp snd sndr sndt sou sox sph sw txw u1 u16 u2 u24 u3 u32 u4 u8 ub ul uw vms voc vox wav wavpcm wve xa".split()
@@ -247,6 +247,7 @@ def get_time_passed():
     return int(hours), int(minutes), int(seconds)
 
 
+# a realtime monitor to view quick summaries on stdout
 def monitor(mlogger, mlogger_lock, mqueue, total_tasks):
     global logger, logger_lock, queue
     global success, fail  # unique to monitor
