@@ -177,6 +177,7 @@ def upsample_sinc(input):
             result = subprocess.run(cmd, capture_output=True)
             if result.returncode > 0:
                 raise RuntimeError(f"When doing cp command: {result.stderr.decode()}")
+            log_info(f"Copied to {transplanted_input}")
             write_history(transplanted_input)
             return True
 
