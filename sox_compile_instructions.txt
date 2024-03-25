@@ -1,0 +1,49 @@
+
+138 seconds - 8 mil
+42 seconds - 16 seconds on wsl2 - 4 mil - luciano
+4 minutes - 2 minutes on wsl2 - 4 mil - dire straits
+21 seconds - 2 mil
+15 seconds - 1 mil
+14 seconds - 500k
+
+
+
+# https://www.xiph.org/downloads/
+# LAME:
+wget -O lame-3.99.5.tar.gz "http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Flame%2Ffiles%2Flame%2F3.99%2F&ts=1416316457&use_mirror=kent"
+
+tar -xf lame-3.99.5.tar.gz
+cd lame-3.99.5
+./configure --prefix=/home/dan/local
+make clean
+make install
+
+FLAC: https://ftp.osuosl.org/pub/xiph/releases/flac/
+MAD: https://sourceforge.net/projects/mad/files/libmad/0.15.1b/libmad-0.15.1b.tar.gz/download
+MAD compilation error: https://stackoverflow.com/questions/16835803/gcc-error-unrecognized-command-line-option-fforce-mem
+
+cd ~/sox
+autoreconf -ivf
+# We need to make sure that the linker can find all the dependencies,
+# and that the includes can also be found. Surprisingly, given that,
+# the configure is pretty good. 
+./configure LDFLAGS=-L/home/dan/local/lib \
+	    CFLAGS=-I/home/dan/local/include \
+	    --prefix=/home/dan/local --with-mad --with-lame --enable-mp3 --enable-flac
+make -s
+make install
+
+~/sox/src/sox --info test.flac
+~/sox/src/sox --info test.mp3
+~/sox/src/sox --info test.wav
+
+~/soxsrc/sox -S -V6 test.flac -b 24 -r 176400 out.flac upsample 4 sinc -22050 -n 4000000 -L -b 0 vol 4
+
+./sox -S test.flac -r 176400 -b 24 fir.flac upsample 4 fir pcm_176K_256K_taps.txt vol 4
+
+./sox -S -V6 paper.flac -b 24 -r 176400 out3/paper8mil.flac upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4
+
+
+https://learn.microsoft.com/en-us/windows/wsl/connect-usb
+
+
