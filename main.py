@@ -174,6 +174,57 @@ def write_history(msg):
             f.write(f"{time_passed} {msg}\n")
 
 
+def upsample_fir(input):
+    try:
+        transplanted_input, input_extension, output_flac = digest_input(input)
+        # do not perform upsampling
+        if input_extension not in INPUT_FORMATS:
+            if transplanted_input in history_readonly:
+                log_info(f"Skipping: {transplanted_input} already exists")
+                return True
+            cmd = f"cp input output".split()
+            cmd[cmd.index("input")] = input
+            cmd[cmd.index("output")] = transplanted_input
+            result = subprocess.run(cmd, capture_output=True)
+            if result.returncode > 0:
+                raise RuntimeError(f"When doing cp command: {result.stderr.decode()}")
+            log_info(f"Copied to {transplanted_input}")
+            write_history(transplanted_input)
+            return True
+
+        if output_flac in history_readonly:
+            log_info(f"Skipping: {output_flac} already exists")
+            return True
+
+        # 4x upsampling for PI2AES interface limit
+        sample_target = 192000
+        if find_sample_rate(input) % 44100 == 0:
+            sample_target = 176400
+
+        cmd = "sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
+        cmd[cmd.index("input")] = input
+        cmd[cmd.index("output")] = output_flac
+        cmd[cmd.index("sample_target")] = str(sample_target)
+        log_info(f"Making... {output_flac}")
+
+        if TEST:
+            time.sleep(0.001)
+        else:
+            result = subprocess.run(cmd, capture_output=True)
+            if result.returncode > 0:
+                raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
+
+        # write mark of completion in HISTORY_FILE
+        write_history(output_flac)
+        log_info(f"Completed {output_flac}")
+    except Exception as e:
+        log_error(
+            f"\ninput: {input}\noutput_flac: {output_flac}\ncmd: {cmd}\nmessage: {e}\n{traceback.format_exc()}"
+        )
+        return False
+    return True
+
+
 def upsample_sinc(input):
     try:
         transplanted_input, input_extension, output_flac = digest_input(input)
@@ -219,7 +270,7 @@ def upsample_sinc(input):
         log_info(f"Completed {output_flac}")
     except Exception as e:
         log_error(
-            f"\ninput: {input}\noutput_flac: {output_flac}\nmessage: {e}\n{traceback.format_exc()}"
+            f"\ninput: {input}\noutput_flac: {output_flac}\ncmd: {cmd}\nmessage: {e}\n{traceback.format_exc()}"
         )
         return False
     return True
@@ -314,7 +365,7 @@ if __name__ == "__main__":
 
     num_processes = multiprocessing.cpu_count() + 1  # 1 extra for monitor
     pool = multiprocessing.Pool(processes=num_processes)
-
+    log_info(f"Using {num_processes} processes.")
     time.sleep(3)
     pool.apply_async(
         monitor, (logger, logger_lock, queue, timestamp_offset, len(all_files))
