@@ -9,6 +9,7 @@ from datetime import datetime
 from collections import Counter
 
 TEST = False
+FILTER = "sinc"
 OUT_DIR = "/mnt/f/HiRes"
 if TEST:
     OUT_DIR = "/home/dan/test_music2"
@@ -24,7 +25,7 @@ if not IN_DIR.startswith("/"):
 
 EXCLUDE_DIRS = ["__MACOSX"]
 INPUT_FORMATS = "8svx aif aifc aiff aiffc al amb au avr cdda cdr cvs cvsd cvu dat dvms f32 f4 f64 f8 flac fssd gsrt hcom htk ima ircam la lpc lpc10 lu maud mp2 mp3 nist prc raw s1 s16 s2 s24 s3 s32 s4 s8 sb sf sl sln smp snd sndr sndt sou sox sph sw txw u1 u16 u2 u24 u3 u32 u4 u8 ub ul uw vms voc vox wav wavpcm wve xa".split()
-
+FIR_COEFFICIENTS_FILE = "pcm_176K_256K_taps.txt"
 
 START_TIME = time.time()
 HISTORY_FILE = os.path.join(OUT_DIR, "history.txt")
@@ -196,15 +197,10 @@ def upsample_fir(input):
             log_info(f"Skipping: {output_flac} already exists")
             return True
 
-        # 4x upsampling for PI2AES interface limit
-        sample_target = 192000
-        if find_sample_rate(input) % 44100 == 0:
-            sample_target = 176400
-
-        cmd = "sox -S -V6 input -b 24 -r sample_target output upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4".split()
+        cmd = "sox -S input -r 176400 -b 24 output upsample 4 fir coefficients vol 4".split()
         cmd[cmd.index("input")] = input
         cmd[cmd.index("output")] = output_flac
-        cmd[cmd.index("sample_target")] = str(sample_target)
+        cmd[cmd.index("coefficients")] = FIR_COEFFICIENTS_FILE
         log_info(f"Making... {output_flac}")
 
         if TEST:
@@ -212,7 +208,7 @@ def upsample_fir(input):
         else:
             result = subprocess.run(cmd, capture_output=True)
             if result.returncode > 0:
-                raise RuntimeError(f"When doing sox sinc command: {result.stderr.decode()}")
+                raise RuntimeError(f"When doing sox fir command: {result.stderr.decode()}")
 
         # write mark of completion in HISTORY_FILE
         write_history(output_flac)
@@ -295,7 +291,12 @@ def task(
     history_file_lock = mhistory_file_lock
     timestamp_offset = mtimestamp_offset
 
-    result = upsample_sinc(input)
+    result = False
+    if FILTER == "sinc":
+        result = upsample_sinc(input)
+    else:
+        result = upsample_fir(input)
+        
     # print(result)
     queue.put(result)
     return result
@@ -398,3 +399,5 @@ if __name__ == "__main__":
         f"{len(new_dir)} new directories, {len(all_dir)} old directories, {len(new_files)} new files, {len(all_files)} old files",
         stdout=True,
     )
+
+
