@@ -1,0 +1,10 @@
+
+~/sox/src/sox --info test.flac
+~/sox/src/sox --info test.mp3
+~/sox/src/sox --info test.wav
+~/soxsrc/sox -S -V6 test.flac -b 24 -r 176400 out.flac upsample 4 sinc -22050 -n 4000000 -L -b 0 vol 4
+./sox -S test.flac -r 176400 -b 24 fir.flac upsample 4 fir pcm_176K_256K_taps.txt vol 4
+./sox -S -V6 paper.flac -b 24 -r 176400 out3/paper8mil.flac upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4
+
+
+https://learn.microsoft.com/en-us/windows/wsl/connect-usb

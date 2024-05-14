@@ -2,7 +2,7 @@ This guide helps you compile a custom version of sox.
 To do that, we need to set up the dependencies.
 
 Step 1:
-Extract the tarball and mv 'local' to ~
+Extract sox_installation.tar.gz and mv directory 'local' to ~
 Skip step 2 (manual dependency installation) and go to step 3.
 
 
@@ -29,7 +29,7 @@ MAD compilation error: https://stackoverflow.com/questions/16835803/gcc-error-un
 # Step 3:
 Compiling sox.
 
-Add to ~/.bashrc:
+Add to ~/.bashrc and source it:
 export PKG_CONFIG="/home/dan/local/lib/pkgconfig"
 export PKG_CONFIG_PATH="/home/dan/local/lib/pkgconfig"
 
@@ -44,6 +44,7 @@ export FLAC_LIBS="-L/home/dan/local/lib -lFLAC"
 git clone https://github.com/rhgg2/sox.git
 cd ~/sox
 
+# install from apt:
 # install libtool
 # install autoconf
 # install pkg-config
@@ -53,31 +54,10 @@ cd ~/sox
 
 autoreconf -ivf
 
-http://akshayc.com/blog/build-sox-from-scratch/
+# from http://akshayc.com/blog/build-sox-from-scratch/, run:
 ./configure LDFLAGS=-L/home/dan/local/lib \
 	    CFLAGS=-I/home/dan/local/include \
 	    --prefix=/home/dan/local --with-mad --with-lame --enable-mp3 --enable-flac
 make -s
 make install
-
-
-
-
-
-
-
-
-
-
-
-~/sox/src/sox --info test.flac
-~/sox/src/sox --info test.mp3
-~/sox/src/sox --info test.wav
-~/soxsrc/sox -S -V6 test.flac -b 24 -r 176400 out.flac upsample 4 sinc -22050 -n 4000000 -L -b 0 vol 4
-./sox -S test.flac -r 176400 -b 24 fir.flac upsample 4 fir pcm_176K_256K_taps.txt vol 4
-./sox -S -V6 paper.flac -b 24 -r 176400 out3/paper8mil.flac upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4
-
-
-https://learn.microsoft.com/en-us/windows/wsl/connect-usb
-
 
