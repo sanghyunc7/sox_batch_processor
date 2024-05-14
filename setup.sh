@@ -24,7 +24,8 @@ fi
 cd "$SCRIPT_DIR/../sox" || exit 1
 
 # Install required packages from apt
-sudo apt-get install -y libtool autoconf pkg-config g++ autoconf-archive make
+apt-get update && apt-get install -y libtool autoconf pkg-config g++ autoconf-archive make || sudo apt-get update && sudo apt-get install -y libtool autoconf pkg-config g++ autoconf-archive make
+
 
 # Run autoreconf to generate configure script
 autoreconf -ivf
