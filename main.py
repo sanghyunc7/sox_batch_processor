@@ -8,11 +8,11 @@ import traceback
 from datetime import datetime
 from collections import Counter
 
-TEST = True
-FILTER = "sinc"
-OUT_DIR = "/mnt/f/boogie_hires"
+TEST = False
+FILTER = "fir" #sinc or fir
+OUT_DIR = "/mnt/f/HiRes_FIR"
 if TEST:
-    OUT_DIR = "/home/dan/test_music2"
+    OUT_DIR = "/home/dan/test_music3"
 
 # where is your music
 IN_DIR = "/mnt/f/boogie"
