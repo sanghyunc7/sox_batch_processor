@@ -16,6 +16,10 @@ echo "export FLAC_CFLAGS=\"-I$SCRIPT_DIR/flac-1.4.3/include\"" >> ~/.bashrc
 echo "export FLAC_LIBS=\"-L$SCRIPT_DIR/local/lib -lFLAC\"" >> ~/.bashrc
 source ~/.bashrc
 
+echo "hello world!"
+echo $FLAC_LIBS
+echo "goodbye!"
+
 # Clone sox repository
 if ! git clone https://github.com/rhgg2/sox.git "$SCRIPT_DIR/../sox"; then
     echo "Error: Failed to clone SoX repository"
