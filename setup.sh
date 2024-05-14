@@ -14,7 +14,7 @@ echo "export LD_LIBRARY_PATH=\"$SCRIPT_DIR/local/lib\"" >> ~/.bashrc
 echo "export PATH=\"$PATH:$SCRIPT_DIR/local/bin\"" >> ~/.bashrc
 echo "export FLAC_CFLAGS=\"-I$SCRIPT_DIR/flac-1.4.3/include\"" >> ~/.bashrc
 echo "export FLAC_LIBS=\"-L$SCRIPT_DIR/local/lib -lFLAC\"" >> ~/.bashrc
-source ~/.bashrc
+source ~/.bashrc || exit 1
 
 echo "hello world!"
 echo $FLAC_LIBS
