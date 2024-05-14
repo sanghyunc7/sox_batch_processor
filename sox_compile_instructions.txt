@@ -1,15 +1,16 @@
+This guide helps you compile a custom version of sox.
+To do that, we need to set up the dependencies.
 
-138 seconds - 8 mil
-42 seconds - 16 seconds on wsl2 - 4 mil - luciano
-4 minutes - 2 minutes on wsl2 - 4 mil - dire straits
-21 seconds - 2 mil
-15 seconds - 1 mil
-14 seconds - 500k
+Step 1:
+Extract the tarball and mv 'local' to ~
+Skip step 2 (manual dependency installation) and go to step 3.
 
 
+Step 2:
+Download the dependencies.
 
 # https://www.xiph.org/downloads/
-# LAME:
+# e.g. LAME:
 wget -O lame-3.99.5.tar.gz "http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Flame%2Ffiles%2Flame%2F3.99%2F&ts=1416316457&use_mirror=kent"
 
 tar -xf lame-3.99.5.tar.gz
@@ -25,7 +26,8 @@ MAD compilation error: https://stackoverflow.com/questions/16835803/gcc-error-un
 
 
 
-
+# Step 3:
+Compiling sox.
 
 Add to ~/.bashrc:
 export PKG_CONFIG="/home/dan/local/lib/pkgconfig"
@@ -39,20 +41,19 @@ export FLAC_LIBS="-L/home/dan/local/lib -lFLAC"
 
 
 
-
-
-
 git clone https://github.com/rhgg2/sox.git
 cd ~/sox
 
-# install autoconf archive first?
+# install libtool
+# install autoconf
+# install pkg-config
+# install g++
+# install autoconf-archive
+# install make
+
 autoreconf -ivf
-# https://stackoverflow.com/questions/18978252/error-libtool-library-used-but-libtool-is-undefined
 
 http://akshayc.com/blog/build-sox-from-scratch/
-# We need to make sure that the linker can find all the dependencies,
-# and that the includes can also be found. Surprisingly, given that,
-# the configure is pretty good. 
 ./configure LDFLAGS=-L/home/dan/local/lib \
 	    CFLAGS=-I/home/dan/local/include \
 	    --prefix=/home/dan/local --with-mad --with-lame --enable-mp3 --enable-flac
