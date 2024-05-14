@@ -18,12 +18,38 @@ cd lame-3.99.5
 make clean
 make install
 
+do the same for:
 FLAC: https://ftp.osuosl.org/pub/xiph/releases/flac/
 MAD: https://sourceforge.net/projects/mad/files/libmad/0.15.1b/libmad-0.15.1b.tar.gz/download
 MAD compilation error: https://stackoverflow.com/questions/16835803/gcc-error-unrecognized-command-line-option-fforce-mem
 
+
+
+
+
+Add to ~/.bashrc:
+export PKG_CONFIG="/home/dan/local/lib/pkgconfig"
+export PKG_CONFIG_PATH="/home/dan/local/lib/pkgconfig"
+
+export LD_LIBRARY_PATH=/home/dan/local/lib:/home
+export PATH=${PATH}:/home/dan/local/bin
+
+export FLAC_CFLAGS="-I/home/dan/flac-1.4.3/include"
+export FLAC_LIBS="-L/home/dan/local/lib -lFLAC"
+
+
+
+
+
+
+git clone https://github.com/rhgg2/sox.git
 cd ~/sox
+
+# install autoconf archive first?
 autoreconf -ivf
+# https://stackoverflow.com/questions/18978252/error-libtool-library-used-but-libtool-is-undefined
+
+http://akshayc.com/blog/build-sox-from-scratch/
 # We need to make sure that the linker can find all the dependencies,
 # and that the includes can also be found. Surprisingly, given that,
 # the configure is pretty good. 
@@ -33,14 +59,21 @@ autoreconf -ivf
 make -s
 make install
 
+
+
+
+
+
+
+
+
+
+
 ~/sox/src/sox --info test.flac
 ~/sox/src/sox --info test.mp3
 ~/sox/src/sox --info test.wav
-
 ~/soxsrc/sox -S -V6 test.flac -b 24 -r 176400 out.flac upsample 4 sinc -22050 -n 4000000 -L -b 0 vol 4
-
 ./sox -S test.flac -r 176400 -b 24 fir.flac upsample 4 fir pcm_176K_256K_taps.txt vol 4
-
 ./sox -S -V6 paper.flac -b 24 -r 176400 out3/paper8mil.flac upsample 4 sinc -22050 -n 8000000 -L -b 0 vol 4
 
 

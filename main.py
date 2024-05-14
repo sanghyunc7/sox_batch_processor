@@ -8,14 +8,14 @@ import traceback
 from datetime import datetime
 from collections import Counter
 
-TEST = False
+TEST = True
 FILTER = "sinc"
-OUT_DIR = "/mnt/f/HiRes"
+OUT_DIR = "/mnt/f/boogie_hires"
 if TEST:
     OUT_DIR = "/home/dan/test_music2"
 
 # where is your music
-IN_DIR = "/mnt/f/Music"
+IN_DIR = "/mnt/f/boogie"
 if len(sys.argv) > 1:
     IN_DIR = sys.argv[1]
 if not IN_DIR.startswith("/"):
