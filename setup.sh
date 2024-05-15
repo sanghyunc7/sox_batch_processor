@@ -4,26 +4,28 @@
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 echo $SCRIPT_DIR
 
-# # Install required packages from apt
-# apt-get update && apt-get install -y libtool autoconf pkg-config gcc g++ autoconf-archive make || \
-#   (echo "Running apt-get update with sudo..." && sudo apt-get update && sudo apt-get install -y libtool autoconf pkg-config gcc g++ autoconf-archive make)
+# Install required packages from apt
+apt-get update && apt-get install -y libtool autoconf pkg-config gcc g++ autoconf-archive make || \
+  (echo "Running apt-get update with sudo..." && sudo apt-get update && sudo apt-get install -y libtool autoconf pkg-config gcc g++ autoconf-archive make)
 
-# tar -xvf "$SCRIPT_DIR/libmad-0.15.1b.tar.gz" -C "$SCRIPT_DIR"
-# tar -xvf "$SCRIPT_DIR/flac-1.4.3.tar.xz" -C "$SCRIPT_DIR"
-# tar -xvf "$SCRIPT_DIR/lame-3.99.5.tar.gz" -C "$SCRIPT_DIR"
+tar -xvf "$SCRIPT_DIR/libmad-0.15.1b.tar.gz" -C "$SCRIPT_DIR"
+tar -xvf "$SCRIPT_DIR/flac-1.4.3.tar.xz" -C "$SCRIPT_DIR"
+tar -xvf "$SCRIPT_DIR/lame-3.99.5.tar.gz" -C "$SCRIPT_DIR"
 
-# cd libmad-0.15.1b
-# ./configure --prefix="$SCRIPT_DIR/local"
-# make clean
-# make install
-# cd ../lame-3.99.5
-# ./configure --prefix="$SCRIPT_DIR/local"
-# make clean
-# make install
-# cd ../flac-1.4.3
-# ./configure --prefix="$SCRIPT_DIR/local"
-# make clean
-# make install
+cd libmad-0.15.1b
+./configure --prefix="$SCRIPT_DIR/local"
+make clean
+make install
+cd ../lame-3.99.5
+./configure --prefix="$SCRIPT_DIR/local"
+make clean
+make install
+cd ../flac-1.4.3
+./configure --prefix="$SCRIPT_DIR/local"
+make clean
+make install
+
+
 
 # Add necessary environment variables to ~/.bashrc for future runs
 echo "export PKG_CONFIG=\"$SCRIPT_DIR/local/lib/pkgconfig\"" >> ~/.bashrc
@@ -55,5 +57,5 @@ make install
 
 
 # test
-sox
-# sox --info "$SCRIPT_DIR/test_192kHz.flac" && echo "SoX has been compiled and installed successfully!" || exit 1
+sox --info "$SCRIPT_DIR/test_192kHz.flac"
+echo "Done"
