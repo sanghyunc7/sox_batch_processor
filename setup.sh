@@ -4,6 +4,9 @@
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 echo $SCRIPT_DIR
 
+ls
+exit 1
+
 # Install required packages from apt
 apt-get update && apt-get install -y libtool autoconf pkg-config gcc g++ autoconf-archive make || \
   (echo "Running apt-get update with sudo..." && sudo apt-get update && sudo apt-get install -y libtool autoconf pkg-config gcc g++ autoconf-archive make)

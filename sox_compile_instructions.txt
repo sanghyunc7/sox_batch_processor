@@ -23,9 +23,6 @@ do the same for:
 FLAC: https://ftp.osuosl.org/pub/xiph/releases/flac/
 MAD: https://sourceforge.net/projects/mad/files/libmad/0.15.1b/libmad-0.15.1b.tar.gz/download
 MAD compilation error: https://stackoverflow.com/questions/16835803/gcc-error-unrecognized-command-line-option-fforce-mem
-
-
-
 # Step 3:
 Compiling sox.
 
