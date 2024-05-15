@@ -46,6 +46,7 @@ export FLAC_LIBS="-L$SCRIPT_DIR/local/lib -lFLAC"
 
 # Clone sox repository
 git clone https://github.com/sanghyunc7/sox.git "$SCRIPT_DIR/../sox" || exit 1
+cd "$SCRIPT_DIR/../sox"
 
 
 
