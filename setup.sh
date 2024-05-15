@@ -7,14 +7,21 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 tar -xzvf "$SCRIPT_DIR/sox_installation.tar.gz" -C "$SCRIPT_DIR"
 
 # Step 3: Compiling sox
-# Add necessary environment variables to ~/.bashrc and source it
+# Add necessary environment variables to ~/.bashrc
 echo "export PKG_CONFIG=\"$SCRIPT_DIR/local/lib/pkgconfig\"" >> ~/.bashrc
 echo "export PKG_CONFIG_PATH=\"$SCRIPT_DIR/local/lib/pkgconfig\"" >> ~/.bashrc
 echo "export LD_LIBRARY_PATH=\"$SCRIPT_DIR/local/lib\"" >> ~/.bashrc
 echo "export PATH=\"$PATH:$SCRIPT_DIR/local/bin\"" >> ~/.bashrc
 echo "export FLAC_CFLAGS=\"-I$SCRIPT_DIR/flac-1.4.3/include\"" >> ~/.bashrc
 echo "export FLAC_LIBS=\"-L$SCRIPT_DIR/local/lib -lFLAC\"" >> ~/.bashrc
-source ~/.bashrc || exit 1
+
+# sourcing bashrc won't work in a non-interactive session
+export PKG_CONFIG="$SCRIPT_DIR/local/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SCRIPT_DIR/local/lib/pkgconfig"
+export LD_LIBRARY_PATH="$SCRIPT_DIR/local/lib"
+export PATH="$PATH:$SCRIPT_DIR/local/bin"
+export FLAC_CFLAGS="-I$SCRIPT_DIR/flac-1.4.3/include"
+export FLAC_LIBS="-L$SCRIPT_DIR/local/lib -lFLAC"
 
 echo "hello world!"
 echo $FLAC_LIBS
