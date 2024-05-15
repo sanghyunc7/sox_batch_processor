@@ -51,4 +51,8 @@ autoreconf -ivf
 # Configure and install sox
 ./configure LDFLAGS=-L"$SCRIPT_DIR/local/lib" CFLAGS=-I"$SCRIPT_DIR/local/include" --prefix="$SCRIPT_DIR/local" --with-mad --with-lame --enable-mp3 --enable-flac
 make -s
-make install && echo "SoX has been compiled and installed successfully!" || exit 1
+make install
+
+
+# test
+sox && sox --info "$SCRIPT_DIR/test_192kHz.flac" && echo "SoX has been compiled and installed successfully!" || exit 1

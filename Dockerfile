@@ -14,6 +14,6 @@ RUN git clone https://github.com/sanghyunc7/sox_batch_processor.git
 WORKDIR /sox_batch_processor
 
 # Run setup.sh
-RUN ./setup.sh && sox && sox --info /sox_batch_processor/test_192kHz.flac
+RUN ./setup.sh
 
 
