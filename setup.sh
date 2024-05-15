@@ -4,6 +4,12 @@
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 echo $SCRIPT_DIR
 
+# Install required packages from apt
+apt-get update && apt-get install -y libtool autoconf pkg-config gcc g++ autoconf-archive make || \
+  (echo "Running apt-get update with sudo..." && sudo apt-get update && sudo apt-get install -y libtool autoconf pkg-config gcc g++ autoconf-archive make)
+
+
+
 tar -xvf "$SCRIPT_DIR/libmad-0.15.1b.tar.gz" -C "$SCRIPT_DIR"
 tar -xvf "$SCRIPT_DIR/flac-1.4.3.tar.xz" -C "$SCRIPT_DIR"
 tar -xvf "$SCRIPT_DIR/lame-3.99.5.tar.gz" -C "$SCRIPT_DIR"
@@ -41,9 +47,6 @@ export FLAC_LIBS="-L$SCRIPT_DIR/local/lib -lFLAC"
 # Clone sox repository
 git clone https://github.com/sanghyunc7/sox.git "$SCRIPT_DIR/../sox" || exit 1
 
-# Install required packages from apt
-apt-get update && apt-get install -y libtool autoconf pkg-config g++ autoconf-archive make || \
-  (echo "Running apt-get update with sudo..." && sudo apt-get update && sudo apt-get install -y libtool autoconf pkg-config g++ autoconf-archive make)
 
 
 # Run autoreconf to generate configure script
